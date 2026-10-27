@@ -1,0 +1,133 @@
+// This is your Prisma schema file for Parent Email Review Agent
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SeverityLevel {
+  Critical
+  High
+  Medium
+  Low
+}
+
+enum FindingStatus {
+  Pass
+  Fail
+  Needs_Review
+  Not_Applicable
+}
+
+enum DocumentStatus {
+  Approved
+  Unapproved
+  Excluded
+}
+
+enum ReviewStatus {
+  draft
+  reviewed
+  approved
+  sent
+  invalidated
+}
+
+model ChecklistPoint {
+  id           String        @id @default(cuid())
+  order        Int
+  title        String
+  description  String
+  category     String
+  severity     SeverityLevel @default(Medium)
+  isMandatory  Boolean       @default(false)
+  isActive     Boolean       @default(true)
+  guidelines   String
+  goodExamples String[]
+  badExamples  String[]
+  version      String        @default("v1.0.0-demo")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  findings     FindingRecord[]
+
+  @@map("checklist_points")
+}
+
+model ReferenceDocument {
+  id          String         @id @default(cuid())
+  title       String
+  filename    String
+  fileType    String
+  folder      String
+  status      DocumentStatus @default(Approved)
+  lastUpdated DateTime       @default(now())
+  size        String
+  summary     String
+  content     String         @db.Text
+  category    String
+  driveFileId String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@map("reference_documents")
+}
+
+model EmailReview {
+  id                String          @id @default(cuid())
+  timestamp         DateTime        @default(now())
+  recipient         String?
+  studentName       String?
+  subject           String
+  originalBody      String          @db.Text
+  suggestedBody     String          @db.Text
+  currentBody       String          @db.Text
+  overallScore      Int             @default(100)
+  summary           String
+  isApproved        Boolean         @default(false)
+  status            ReviewStatus    @default(draft)
+  checklistVersion  String          @default("v1.0.0-demo")
+  
+  // Approval Details
+  approvedAt        DateTime?
+  approverName      String?
+  verificationToken String?
+  approvalNotes     String?
+  approvedSubject   String?
+  approvedBody      String?         @db.Text
+
+  findings          FindingRecord[]
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@map("email_reviews")
+}
+
+model FindingRecord {
+  id                  String         @id @default(cuid())
+  reviewId            String
+  review              EmailReview    @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  checklistId         String
+  checklist           ChecklistPoint @relation(fields: [checklistId], references: [id])
+  checklistTitle      String
+  status              FindingStatus  @default(Pass)
+  severity            SeverityLevel  @default(Medium)
+  explanation         String
+  exactText           String?
+  suggestedCorrection String?
+  applied             Boolean        @default(false)
+  dismissed           Boolean        @default(false)
+  referenceDocName    String?
+  referenceExcerpt    String?
+  confidenceScore     Int            @default(95)
+
+  createdAt           DateTime       @default(now())
+
+  @@map("finding_records")
+}
